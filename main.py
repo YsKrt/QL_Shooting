@@ -1,6 +1,5 @@
 import pygame
 from pygame.locals import *
-import  numpy as np
 import tkinter as tk
 import random
 import sys
@@ -126,6 +125,9 @@ class Game():
         self.bot=Bot(SCREEN_SIZE[0] / 2 - 15, SCREEN_SIZE[1] / 3 - 15, 30, 30,0,0,2)
         self.pHp=10
         self.bHp=10
+        self.bBuoutf=0
+        self.pBuoutf=0
+        self.reflectf=0
         self.table = [[[[[[[[0 for i8 in range(10)] for i7 in range(2)] for i6 in range(10)] for i5 in range(2)] for i4 in
                     range(9)] for i3 in range(5)] for i2 in range(9)] for i1 in range(5)]
         count = 0
@@ -142,9 +144,9 @@ class Game():
 
     def draw(self,screen,font):
         for item in self.pBullet:
-            pygame.draw.rect(screen, (0, 0, 0), Rect(item.x, item.y, item.width, item.height))
+            pygame.draw.rect(screen, (100, 0, 0), Rect(item.x, item.y, item.width, item.height))
         for item in self.bBullet:
-            pygame.draw.rect(screen, (0, 0, 0), Rect(item.x, item.y, item.width, item.height))
+            pygame.draw.rect(screen, (0, 100, 0), Rect(item.x, item.y, item.width, item.height))
         pygame.draw.rect(screen, (255, 0, 0), Rect(self.player.x, self.player.y, self.player.width, self.player.height))
         pygame.draw.rect(screen, (0, 255, 0), Rect(self.bot.x, self.bot.y, self.bot.width, self.bot.height))
         text = font.render(f"Player HP:{self.player.hp}", True, (255, 100, 100))  # 描画する文字列の設定
@@ -156,19 +158,20 @@ class Game():
         self.player.out()
         if self.player.action==5:
             if len(self.pBullet)<1:
-                b = bullet(self.player.x + self.player.width / 2, self.player.y + self.player.height / 2, 15, 15, 0, -15, 1)
+                b = bullet(self.player.x + self.player.width / 2, self.player.y + self.player.height / 2, 10, 10, 0, -15, 1)
                 self.pBullet.append(b)
         self.bot.update()
         self.bot.out()
         if self.bot.action == 5:
             if len(self.bBullet) < 1:
-                b = bullet(self.bot.x + self.bot.width / 2, self.bot.y + self.bot.height / 2, 15, 15, 0, 15,2)
+                b = bullet(self.bot.x + self.bot.width / 2, self.bot.y + self.bot.height / 2, 10, 10, 0, 15,2)
                 self.bBullet.append(b)
 
         for item in self.pBullet:
             item.update()
             dead=0
             if item.out()==1:
+                self.pBuoutf=1
                 dead=1
             if item.x + item.width / 2 > self.bot.x and item.x + item.width / 2 < self.bot.x + self.bot.width and item.y + item.height / 2 > self.bot.y and item.y + item.height / 2 < self.bot.y + self.bot.height:
                 dead=1
@@ -180,6 +183,7 @@ class Game():
             item.update()
             dead=0
             if item.out()==1:
+                self.bBuoutf=1
                 dead=1
             if item.x + item.width / 2 > self.player.x and item.x + item.width / 2 < self.player.x + self.player.width and item.y + item.height / 2 > self.player.y and item.y + item.height / 2 < self.player.y + self.player.height:
                 dead=1
@@ -187,6 +191,11 @@ class Game():
             if dead==1:
                 self.bBullet.remove(item)
 
+        for item in self.pBullet:
+            for item2 in self.bBullet:
+                if item.x + item.width / 2 > item2.x and item.x + item.width / 2 < item2.x + item2.width and item.y + item.height / 2 > item2.y and item.y + item.height / 2 < item2.y + item2.height:
+                    item.vy,item2.vy=item2.vy,item.vy
+                    self.reflectf=1
     def init(self):
         self.player.init(SCREEN_SIZE[0] / 2 - 15, SCREEN_SIZE[1] / 3*2 - 15, 30, 30,0,0,1)
         self.bot.init(SCREEN_SIZE[0] / 2 - 15, SCREEN_SIZE[1] / 3 - 15, 30, 30,0,0,2)
@@ -211,7 +220,7 @@ class Game():
         for i in range(3):
             for j in range(3):
                 if SCREEN_SIZE[0]/3*j<=x and SCREEN_SIZE[0]/3*(j+1)>=x and SCREEN_SIZE[1]/3*i<=y and SCREEN_SIZE[1]/3*(i+1)>=y:
-                    return i+j+1
+                    return i*3+(j+1)
     def get_state(self,pa,pp,ba,bp,pba,pbp,bba,bbp):
         return self.table[pa-1][pp-1][ba-1][bp-1][pba][pbp-1][bba][bbp-1]
 
@@ -233,15 +242,27 @@ class Game():
         return self.get_state(self.player.action,self.pos(self.player.x,self.player.y),self.bot.action,self.pos(self.bot.x,self.bot.y),
                               pba,pbp,bba,bbp)
     def review(self):
-        if self.player.hp<self.pHp:
+        if self.player.hp<self.pHp:#プレイヤーがダメージを受けたとき
             self.pHp=self.player.hp
             return 1
-        elif self.bot.hp<self.bHp:
+        elif self.bot.hp<self.bHp:#ボットがダメージを受けたとき
             self.bHp=self.bot.hp
             return 2
-        elif self.bot.outf==1:
+        elif self.bot.outf==1:#ボットが端にいるとき
             self.bot.outf=0
             return 3
+        elif self.player.outf==1:#プレイヤーが端にいるとき
+            self.player.outf=0
+            return 4
+        elif self.bBuoutf==1:#ボットの弾がステージ外に出たとき
+            self.bBuoutf=0
+            return 5
+        elif self.pBuoutf==1:#プレイヤーの弾がステージ外に出たとき
+            self.pBuoutf=0
+            return 6
+        elif self.reflectf==1:#弾同士がぶつかったとき
+            self.reflectf=0
+            return 7
         else:
             return 0
     def bot_control(self,flag,action):
@@ -263,15 +284,16 @@ class Game():
                 action=2
             if k_space==1:
                 action=5
-
+            if k_up>=1 or k_down>=1 or k_right>=1 or k_left>=1 or k_space:
+                self.player.control(action)
             self.player.vx/=1.05
             self.player.vy /= 1.05
+        if flag==2:
             self.player.control(action)
+
 
 class Learn():
     def __init__(self):
-        self.table = [[[[[[[[0 for i8 in range(10)] for i7 in range(2)] for i6 in range(10)] for i5 in range(2)] for i4 in
-                    range(11)] for i3 in range(6)] for i2 in range(10)] for i1 in range(6)]
         self.game=Game()
         self.screen = pygame.display.set_mode(SCREEN_SIZE, pygame.DOUBLEBUF)
         pygame.init()
@@ -279,12 +301,12 @@ class Learn():
         clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 20)
         self.q_table=[0]*810001
+        self.player_qtable=[0]*810001
         self.winrate=0
         self.player_win=0
         self.bot_win=0
         self.count=0
         self.trainF=1
-
         self.y=[]
 
         self.read=read()
@@ -292,7 +314,26 @@ class Learn():
         self.trainCount=self.read.learncount
         self.playORai=self.read.playORai
         self.q_table=self.read.q_table
-        print(f"{self.q_table}")
+        self.player_qtable=self.read.player_qtable
+        """#報酬を得た場面を表示する
+        k=0
+        for i,n in enumerate(self.q_table):
+            if n>7777777777:
+                k=i
+                break
+        for i1,n1 in enumerate(self.game.table):
+            for i2,n2 in enumerate(self.game.table[i1]):
+                for i3, n3 in enumerate(self.game.table[i1][i2]):
+                    for i4, n4 in enumerate(self.game.table[i1][i2][i3]):
+                        for i5, n5 in enumerate(self.game.table[i1][i2][i3][i4]):
+                            for i6, n6 in enumerate(self.game.table[i1][i2][i3][i4][i5]):
+                                for i7, n7 in enumerate(self.game.table[i1][i2][i3][i4][i5][i6]):
+                                    for i8, n8 in enumerate(self.game.table[i1][i2][i3][i4][i5][i6][i7]):
+                                        if self.game.table[i1][i2][i3][i4][i5][i6][i7][i8]==k:
+                                            li=[i1,i2,i3,i4,i5,i6,i7,i8]
+                                            print(f"{li}")
+        """
+
         while True:
             if self.trainF==1:
                 self.update()
@@ -334,71 +375,153 @@ class Learn():
                         pygame.quit()
                         sys.exit()
     def update(self):
-        self.game.player_control(self.playORai, 0)
-        #self.game.bot_control(0, 0)
-        self.reflect()
+        self.player_control()
+        self.bot_control()
         self.game.update()
         self.update_qtable()
     def update_qtable(self):
         review=self.game.review()
         state=self.game.now_state()
-        if review!=0:
-            self.q_table[state] += self.get_reward(review)
+        self.q_table[state] += self.get_reward(review)
+        if self.playORai==2:
+            self.player_qtable[state]+=self.player_get_reward(review)
     def get_reward(self,flag):
         reward=0
-        if flag == 1:
-            reward=273
+        if flag==0:
+            reward=-1
+        elif flag == 1:
+            reward=77777777777
         elif flag==2:
-            reward=-349
+            reward=-1
         elif flag==3:
-            reward=-7
+            reward=-1
+        elif flag==4:
+            pass
+        elif flag==5:
+            reward=-1
+        elif flag==6:
+            reward=1
+        elif flag==7:
+            reward=7777777777
         return reward
-    def reflect(self):
+    def player_get_reward(self,flag):
+        reward = 0
+        if flag == 0:
+            reward = 0
+        elif flag == 1:
+            reward = 0
+        elif flag == 2:
+            reward = 999999999
+        elif flag == 3:
+            pass
+        elif flag == 4:
+            reward = 0
+        elif flag == 5:
+            reward = 0
+        elif flag == 6:
+            reward = 0
+        elif flag==7:
+            reward=999999
+        return reward
+    def bot_control(self):
         self.game.bot_control(1,self.get_action())
-    def get_action(self):
+    def player_control(self):
+        self.game.player_control(self.playORai, self.player_get_action())
+    def player_get_action(self):
         review=[]
         maxreview=0
-        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!次の行動をしたときの評価値を得る。プレイヤーはめんどいから動かさない
+        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!次の行動をしたときの評価値を得る。同じQテーブルで符号を入れ替える。
         if len(self.game.pBullet)==0:
             pba=0
             pbp=9
         else:
             pba=self.game.pBullet[0].action
-            pbp=self.game.pos(self.game.pBullet[0].x,self.game.pBullet[0].y-50)
+            pbp=self.game.pos(self.game.pBullet[0].x,self.game.pBullet[0].y+self.game.pBullet[0].vx)
         if len(self.game.bBullet) == 0:
             bba = 0
             bbp = 9
         else:
             bba = self.game.bBullet[0].action
             bbp = self.game.pos(self.game.bBullet[0].x,self.game.bBullet[0].y+self.game.bBullet[0].vy)
-        next_state = self.game.get_state(self.game.player.action, self.game.pos(self.game.player.x, self.game.player.y),
+
+        next_state = self.game.get_state(1, self.game.pos(self.game.player.x+10, self.game.player.y),
+                                         self.game.bot.action, self.game.pos(self.game.bot.x+self.game.bot.vx,self.game.bot.y+self.game.bot.vy),
+                                         pba, pbp, bba, bbp)
+        review.append(self.player_qtable[next_state])
+        next_state = self.game.get_state(2, self.game.pos(self.game.player.x - 10, self.game.player.y),
+                                         self.game.bot.action, self.game.pos(self.game.bot.x+self.game.bot.vx, self.game.bot.y+self.game.bot.vy),
+                                         pba, pbp, bba, bbp)
+        review.append(self.player_qtable[next_state])
+        next_state = self.game.get_state(3, self.game.pos(self.game.player.x, self.game.player.y+10),
+                                         self.game.bot.action, self.game.pos(self.game.bot.x+self.game.bot.vx, self.game.bot.y+self.game.bot.vy),
+                                         pba, pbp, bba, bbp)
+        review.append(self.player_qtable[next_state])
+        next_state = self.game.get_state(4, self.game.pos(self.game.player.x, self.game.player.y-10),
+                                         self.game.bot.action, self.game.pos(self.game.bot.x+self.game.bot.vx, self.game.bot.y+self.game.bot.vy),
+                                         pba, pbp, bba, bbp)
+        review.append(self.player_qtable[next_state])
+        next_state = self.game.get_state(5, self.game.pos(self.game.player.x , self.game.player.y),
+                                         self.game.bot.action, self.game.pos(self.game.bot.x+self.game.bot.vx, self.game.bot.y+self.game.bot.vy),
+                                         pba, pbp, bba, bbp)
+        review.append(self.player_qtable[next_state])
+
+        action=0
+        for i,item in enumerate(review):
+            if item>maxreview:
+                action=i+1
+                maxreview=item
+        if maxreview==0 :#全ての評価値が0のとき
+            action=random.randint(1,5)
+            maxreview = -1
+        #報酬を得られる一つ手前の状態にも同じ報酬を与える。
+        self.player_qtable[self.game.now_state()]=maxreview
+        return action
+    def get_action(self):
+        review=[]
+        maxreview=0
+        if len(self.game.pBullet)==0:
+            pba=0
+            pbp=9
+        else:
+            pba=self.game.pBullet[0].action
+            pbp=self.game.pos(self.game.pBullet[0].x,self.game.pBullet[0].y+self.game.pBullet[0].vx)
+        if len(self.game.bBullet) == 0:
+            bba = 0
+            bbp = 9
+        else:
+            bba = self.game.bBullet[0].action
+            bbp = self.game.pos(self.game.bBullet[0].x,self.game.bBullet[0].y+self.game.bBullet[0].vy)
+        next_state = self.game.get_state(self.game.player.action, self.game.pos(self.game.player.x+self.game.player.vx, self.game.player.y+self.game.player.vy),
                                          1, self.game.pos(self.game.bot.x + 10,self.game.bot.y),
                                          pba, pbp, bba, bbp)
         review.append(self.q_table[next_state])
-        next_state = self.game.get_state(self.game.player.action, self.game.pos(self.game.player.x, self.game.player.y),
+        next_state = self.game.get_state(self.game.player.action, self.game.pos(self.game.player.x+self.game.player.vx, self.game.player.y+self.game.player.vy),
                                          2, self.game.pos(self.game.bot.x - 10, self.game.bot.y),
                                          pba, pbp, bba, bbp)
         review.append(self.q_table[next_state])
-        next_state = self.game.get_state(self.game.player.action, self.game.pos(self.game.player.x, self.game.player.y),
+        next_state = self.game.get_state(self.game.player.action, self.game.pos(self.game.player.x+self.game.player.vx, self.game.player.y+self.game.player.vy),
                                          3, self.game.pos(self.game.bot.x, self.game.bot.y+10),
                                          pba, pbp, bba, bbp)
         review.append(self.q_table[next_state])
-        next_state = self.game.get_state(self.game.player.action, self.game.pos(self.game.player.x, self.game.player.y),
+        next_state = self.game.get_state(self.game.player.action, self.game.pos(self.game.player.x+self.game.player.vx, self.game.player.y+self.game.player.vy),
                                          4, self.game.pos(self.game.bot.x , self.game.bot.y-10),
                                          pba, pbp, bba, bbp)
         review.append(self.q_table[next_state])
-        next_state = self.game.get_state(self.game.player.action, self.game.pos(self.game.player.x, self.game.player.y),
+        next_state = self.game.get_state(self.game.player.action, self.game.pos(self.game.player.x+self.game.player.vx, self.game.player.y+self.game.player.vy),
                                          5, self.game.pos(self.game.bot.x, self.game.bot.y),
                                          pba, pbp, bba, bbp)
         review.append(self.q_table[next_state])
 
         action=0
         for i,item in enumerate(review):
-            if item>action:
+            if item>maxreview:
                 action=i+1
                 maxreview=item
-        if maxreview==0 or random.randint(1,100)==1:#全ての評価値が0か、1%の確率でランダムに
+        if maxreview==0:#全ての評価値が0のとき
             action=random.randint(1,5)
+            maxreview=-1
+        # 報酬を得られる一つ手前の状態にも同じ報酬を与える。
+        self.q_table[self.game.now_state()] = maxreview
         return action
     def draw(self):
         self.game.draw(self.screen,self.font)
@@ -413,11 +536,16 @@ class Learn():
             print(f"勝率:{self.winrate}%,回数:{self.count}")
             if self.count%100==0 and self.count>=100:
                 with open(f"{self.count}.txt","w") as f:
-                    #strlist = [str(n) for n in self.q_table]
                     strlist=[]
                     for n in self.q_table:
                         strlist.append(str(n)+"\n")
                     f.writelines(strlist)
+                if self.playORai==2:
+                    with open("P_"+f"{self.count}.txt","w") as f:
+                        strlist=[]
+                        for n in self.player_qtable:
+                            strlist.append(str(n)+"\n")
+                        f.writelines(strlist)
             self.y.append(self.winrate)
             if self.count == self.trainCount:
                 plt.plot(self.y)
@@ -425,19 +553,18 @@ class Learn():
             self.game.init()
 
 
-#プレイヤーの操作改善、強化学習同士の対戦、何もしない状態を追加@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-
 class read():
     def __init__(self):
         self.q_table=[0]*810001
+        self.player_qtable=[0]*810001
         self.win = tk.Tk()
         self.win.title("読み込む学習回数")
-        self.label = tk.Label(text="読み込むデータの学習回数(.txtは不要)を指定してください。作成されていないと読み込めません。")
+        self.label = tk.Label(text="読み込むデータの学習回数(.txtは不要)を指定してください。")
         self.box = tk.Entry()
         self.box.focus_set()
         self.label2=tk.Label(text="行う学習回数を指定してください。自分で操作する場合は0を入力してください。")
         self.box2=tk.Entry()
-        self.label3 = tk.Label(text="乱数:0, 操作可能:1")
+        self.label3 = tk.Label(text="乱数:0, 操作可能:1, 学習済みは学習回数(>=100):")
         self.box3 = tk.Entry()
         self.learncount=0
         self.playORai=0
@@ -456,7 +583,14 @@ class read():
                 strlist = f.readlines()
                 self.q_table = [int(s) for s in strlist]
         self.learncount = int(self.box2.get())
-        self.playORai=int(self.box3.get())
+        if int(self.box3.get())>=100:
+            self.playORai = 2
+            if os.path.exists("P_"+f"{self.box.get()}.txt") == True:
+                with open("P_"+f"{self.box.get()}.txt", "r") as f:
+                    strlist = f.readlines()
+                    self.player_qtable = [int(s) for s in strlist]
+        else:
+            self.playORai=int(self.box3.get())
         self.win.destroy()
 
 
